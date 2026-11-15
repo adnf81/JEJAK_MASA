@@ -310,6 +310,9 @@ body[data-mode="p2"] #g2,body[data-mode="p3"] #g3{display:block}
 @keyframes thnpop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion:reduce){#g2 .konfeti{display:none}#g2 #g2end .thn{animation:none}}
 
+#g2 .lapnota{font-size:.82rem;opacity:.85;margin:4px 0 8px;min-height:0}
+#g2 .lapnota:empty{display:none}
+
 /* ===== Permainan 3: History Hero - Battle of Knowledge ===== */
 #g3{overflow:auto;-webkit-overflow-scrolling:touch;background:radial-gradient(1200px 700px at 50% -10%,#3b2a8c,#150f3a 70%);color:#f4efff;font-family:var(--body)}
 #g3 .hh{max-width:860px;margin:0 auto;padding:12px 12px 70px;position:relative}
@@ -746,7 +749,7 @@ body[data-mode="p2"] #g2,body[data-mode="p3"] #g3{display:block}
     <div class="field">
       <span class="lab" id="lab-a">Bacakan cerita dan soalan secara automatik</span>
       <div class="seg" id="segA" role="group" aria-labelledby="lab-a"></div>
-      <p class="hint">Setiap kad ada butang Dengar soalan. Pilih Hidup jika mahu kad dibacakan sebaik sahaja dibuka.</p>
+      <p class="hint">Setiap kad ada butang Dengar soalan. Pilih Buka jika mahu kad dibacakan sebaik sahaja dibuka.</p>
     </div>
     <div class="field">
       <span class="lab" id="lab-n">Bilangan pemain</span>
@@ -2598,7 +2601,7 @@ function binaTahap(){
 }
 function binaAuto(){
   const sg=$('segA'); sg.textContent='';
-  [['Mati',false],['Hidup',true]].forEach(a=>{
+  [['Padam',false],['Buka',true]].forEach(a=>{
     const b=el('button','',a[0]); b.type='button'; b.setAttribute('aria-pressed',String(autoBaca===a[1]));
     b.addEventListener('click',()=>{autoBaca=a[1];lsSet('jm-auto',a[1]?'1':'0');binaAuto()}); sg.appendChild(b);
   });
@@ -2874,7 +2877,7 @@ function onLukisLobi(){
   for(let i=0;i<4;i++){
     const p=ON.lobi[i], r=el('div','lobirow'+(p?'':' kosong'));
     if(p){ r.appendChild(tokEl(i,p.buah)); r.appendChild(el('span','',p.nama+(i===ON.slot?' (anda)':''))); r.appendChild(el('small','',i===0?'Tuan rumah':'Sertai'));
-      if(ON.hos&&i>0){ const b=el('button','btn kick',ON.sahT&&ON.sahT.sid===p.sid&&Date.now()-ON.sahT.t<4000?'Pasti? Ketuk lagi':'Keluarkan'); b.type='button'; b.setAttribute('aria-label','Keluarkan '+p.nama); b.addEventListener('click',()=>onTendangLobi(p.sid,p.nama)); r.appendChild(b) } }
+      if(ON.hos&&i>0){ const b=el('button','btn kick',ON.sahT&&ON.sahT.sid===p.sid&&Date.now()-ON.sahT.t<4000?'Tekan sekali lagi':'Keluarkan'); b.type='button'; b.setAttribute('aria-label','Keluarkan '+p.nama); b.addEventListener('click',()=>onTendangLobi(p.sid,p.nama)); r.appendChild(b) } }
     else r.appendChild(el('span','','Menunggu pemain…'));
     s.appendChild(r);
   }
@@ -2961,7 +2964,7 @@ function onKemasStatus(){
     const ada=i===ON.slot||(!p.keluar&&now-(ON.lihat[i]||0)<9000);
     b.appendChild(el('span','op'+(ada?' ok':''),(ada?'● ':'○ ')+p.nama));
     if(ON.hos&&i!==ON.slot&&!p.keluar){
-      const k=el('button','kickmini',ON.sahT&&ON.sahT.slot===i&&Date.now()-ON.sahT.t<4000?'Pasti? Ketuk lagi':'Keluarkan'); k.type='button'; k.setAttribute('aria-label','Keluarkan '+p.nama);
+      const k=el('button','kickmini',ON.sahT&&ON.sahT.slot===i&&Date.now()-ON.sahT.t<4000?'Tekan sekali lagi':'Keluarkan'); k.type='button'; k.setAttribute('aria-label','Keluarkan '+p.nama);
       k.addEventListener('click',()=>onTendangGame(i)); b.appendChild(k);
     }
   });
@@ -3434,21 +3437,16 @@ function lpBangun(senarai,tamat){
   return d.siap();
 }
 let lpUrl=null;
-async function lpMuat(){
-  if(!players||!players.length) return;
-  const dalam=typeof ON!=='undefined'&&ON.aktif&&ON.slot>=0&&players[ON.slot];
-  const senarai=dalam?[ON.slot]:players.map((_,i)=>i);
-  const n=$('laporanNota'); const tulis=t=>{ if(n) n.textContent=t };
-  let u8; try{ u8=lpBangun(senarai,!started) }catch(e){ tulis('Laporan tidak dapat dijana. Cuba lagi.'); return }
-  const nama='Laporan-JejakMasa-'+(dalam?players[ON.slot].nama:(players.length>1?'semua-pemain':players[0].nama)).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,24)+'.pdf';
+/* simpan PDF: kongsi antara Permainan 1, 2 dan 3. tulis(teks,paut) memaparkan mesej; paut = alamat blob jika muat turun automatik gagal */
+async function lpSimpan(u8,nama,tulis){
   const blob=new Blob([u8],{type:'application/pdf'});
   /* Di dalam Claude, muat turun melalui keupayaan "downloads" (pelayar menyekat muat turun terus dalam bingkai artifak) */
   try{
     if(window.claude&&typeof window.claude.use==='function'){
       const dl=await Promise.race([window.claude.use('downloads'),delay(2500).then(()=>null)]);
       if(dl&&typeof dl.save==='function'){
-        try{ await dl.save({filename:nama,data:blob}); tulis('Laporan PDF disimpan: '+nama+'.'); return }
-        catch(e){ if(e&&e.code==='declined'){ tulis('Muat turun dibatalkan. Tekan butang sekali lagi jika mahu menyimpannya.'); return } }
+        try{ await dl.save({filename:nama,data:blob}); tulis('Laporan PDF disimpan: '+nama+'.'); return true }
+        catch(e){ if(e&&e.code==='declined'){ tulis('Muat turun dibatalkan. Tekan butang sekali lagi jika mahu menyimpannya.'); return false } }
       }
     }
   }catch(e){}
@@ -3457,12 +3455,93 @@ async function lpMuat(){
   const a=document.createElement('a'); a.href=lpUrl; a.download=nama; a.style.display='none'; document.body.appendChild(a);
   try{ a.click() }catch(e){}
   a.remove();
-  if(n){ n.textContent=''; n.appendChild(document.createTextNode('Laporan PDF sedang dimuat turun ('+nama+'). Jika tiada fail muncul, '));
-    const l=document.createElement('a'); l.href=lpUrl; l.target='_blank'; l.rel='noopener'; l.textContent='ketik di sini untuk membukanya'; l.style.color='var(--gold)';
-    n.appendChild(l); n.appendChild(document.createTextNode('.')) }
-  const t=$('laporanTop'); if(t){ t.textContent='Disimpan'; setTimeout(()=>{t.textContent='Laporan PDF'},2200) }
+  tulis('Laporan PDF sedang dimuat turun ('+nama+'). Jika tiada fail muncul, ',lpUrl);
+  return true;
 }
-window.__lp={bangun:lpBangun,muat:lpMuat,jejak:()=>jejak};
+/* papar mesej dalam satu elemen (teks biasa, atau teks + pautan) */
+function lpPapar(n){
+  return function(t,paut){
+    if(!n) return;
+    if(!paut){ n.textContent=t; return }
+    n.textContent=''; n.appendChild(document.createTextNode(t));
+    const l=document.createElement('a'); l.href=paut; l.target='_blank'; l.rel='noopener'; l.textContent='tekan di sini untuk membukanya'; l.style.color='var(--gold)';
+    n.appendChild(l); n.appendChild(document.createTextNode('.'));
+  };
+}
+async function lpMuat(){
+  if(!players||!players.length) return;
+  const dalam=typeof ON!=='undefined'&&ON.aktif&&ON.slot>=0&&players[ON.slot];
+  const senarai=dalam?[ON.slot]:players.map((_,i)=>i);
+  const tulis=lpPapar($('laporanNota'));
+  let u8; try{ u8=lpBangun(senarai,!started) }catch(e){ tulis('Laporan tidak dapat dijana. Cuba lagi.'); return }
+  const nama='Laporan-JejakMasa-'+(dalam?players[ON.slot].nama:(players.length>1?'semua-pemain':players[0].nama)).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,24)+'.pdf';
+  const ok=await lpSimpan(u8,nama,tulis);
+  const t=$('laporanTop'); if(ok&&t){ t.textContent='Disimpan'; setTimeout(()=>{t.textContent='Laporan PDF'},2200) }
+}
+/* ============ Laporan PDF untuk Permainan 2 dan 3 ============
+   o = {permainan, fail, meta:[teks], kotak:[[label,nilai]x4], peratus, rekod:[{t,no,unit,soalan,jawab,betul,ok,ulasan}], nota} */
+function lpBangunUmum(o){
+  const d=lpDok('Laporan Jejak Masa: '+o.permainan);
+  const UNGU=[.16,.1,.4], KELABU=[.4,.38,.5], HIJAU=[.05,.5,.35], MERAH=[.75,.15,.25];
+  d.kotak(d.M,d.ty,d.W-2*d.M,70,[.16,.1,.4]);
+  d.teks(d.M+16,d.ty+30,'Jejak Masa',24,true,[1,1,1]);
+  d.teks(d.M+16,d.ty+52,'Laporan permainan '+lpBersih(o.permainan),11.5,false,[.9,.88,1]);
+  d.ty+=84;
+  const tk=new Date(), pad=n=>('0'+n).slice(-2);
+  d.para('Tarikh dan masa laporan: '+pad(tk.getDate())+'/'+pad(tk.getMonth()+1)+'/'+tk.getFullYear()+', '+pad(tk.getHours())+':'+pad(tk.getMinutes()),{sz:10});
+  (o.meta||[]).forEach(t=>d.para(t,{sz:10}));
+  d.ty+=4;
+  const kw=(d.W-2*d.M-24)/4;
+  (o.kotak||[]).forEach((a,i)=>{ const x=d.M+i*(kw+8); d.kotak(x,d.ty,kw,44,[.95,.94,.99]); d.teks(x+9,d.ty+15,lpBersih(a[0]),9,false,KELABU); d.teks(x+9,d.ty+35,lpBersih(String(a[1])),16,true,UNGU) });
+  d.ty+=54;
+  const pr=o.peratus;
+  if(pr!=null){ const bw=d.W-2*d.M; d.kotak(d.M,d.ty,bw,8,[.9,.88,.95]); d.kotak(d.M,d.ty,bw*pr/100,8,pr>=70?[.22,.75,.55]:pr>=40?[.95,.7,.2]:[.9,.35,.4]); d.ty+=18 }
+  const rek=o.rekod||[];
+  if(!rek.length){
+    d.para('Belum ada soalan yang dijawab. Laporan ini akan menunjukkan topik yang dikuasai dan topik untuk diulang kaji selepas pemain menjawab soalan.',{sz:10.5,c:KELABU});
+  } else {
+    const topik={}, urutan=[];
+    rek.forEach(x=>{ const k=x.t+'|'+x.no; if(!topik[k]){ topik[k]={t:x.t,no:x.no,unit:x.unit,betul:0,jum:0}; urutan.push(k) } topik[k].jum++; if(x.ok) topik[k].betul++ });
+    const kuasai=urutan.filter(k=>topik[k].betul===topik[k].jum), ulang=urutan.filter(k=>topik[k].betul<topik[k].jum);
+    if(kuasai.length){
+      d.tajukBahagian('Topik yang dikuasai');
+      kuasai.forEach(k=>{ const t=topik[k]; d.para('Tahun '+t.t+', Unit '+t.no+': '+t.unit+' (betul '+t.betul+' daripada '+t.jum+')',{sz:10,ind:10,c:HIJAU}) });
+    }
+    const salah=rek.filter(x=>!x.ok);
+    if(salah.length){
+      d.tajukBahagian('Soalan untuk diulang kaji',[1,.93,.9]);
+      salah.forEach(x=>{
+        d.perlu(90);
+        d.para('Tahun '+x.t+', Unit '+x.no+': '+x.unit,{sz:10.5,tebal:true,c:MERAH,jarak:1});
+        d.para('Soalan: '+x.soalan,{sz:10,ind:10,jarak:1});
+        d.para('Jawapan anda: '+(x.jawab||'-'),{sz:10,ind:10,c:MERAH,jarak:1});
+        d.para('Jawapan betul: '+x.betul,{sz:10,ind:10,c:HIJAU,jarak:1});
+        if(x.ulasan) d.para('Penjelasan: '+x.ulasan,{sz:10,ind:10,jarak:1});
+        d.ty+=5;
+      });
+    } else if(ulang.length===0){
+      d.para('Semua soalan dijawab dengan betul. Tahniah!',{sz:10.5,tebal:true,c:HIJAU});
+    }
+    d.tajukBahagian('Semua soalan yang dijawab');
+    rek.forEach((x,i)=>{
+      d.perlu(26);
+      const lbl=x.ok?'Betul':'Belum tepat';
+      d.teks(d.M+4,d.ty+10,lbl,9,true,x.ok?HIJAU:MERAH);
+      lpLilit(lpBersih((i+1)+'. '+x.soalan),d.W-2*d.M-70,9.5,false).forEach((t,j)=>{ if(j>0) d.perlu(13); d.teks(d.M+66,d.ty+10,t,9.5,false); d.ty+=13 });
+      d.ty+=3;
+    });
+  }
+  d.perlu(60); d.ty+=10;
+  d.garis(d.M,d.ty,d.W-d.M,d.ty,[.8,.78,.9],.6); d.ty+=6;
+  d.para(o.nota||'Laporan ini dijana secara automatik oleh permainan Jejak Masa. Soalan disusun berdasarkan topik buku teks Sejarah KSSR Tahun 4, 5 dan 6. Guru atau ibu bapa digalakkan menyemak jawapan bersama pemain.',{sz:8.5,c:KELABU});
+  return d.siap();
+}
+async function lpUmum(o,n){
+  const tulis=lpPapar(n);
+  let u8; try{ u8=lpBangunUmum(o) }catch(e){ tulis('Laporan tidak dapat dijana. Cuba lagi.'); return false }
+  return lpSimpan(u8,o.fail||'Laporan-JejakMasa.pdf',tulis);
+}
+window.__lp={bangun:lpBangun,muat:lpMuat,jejak:()=>jejak,umum:lpUmum,bangunUmum:lpBangunUmum,papar:lpPapar};
 if($('laporan')) $('laporan').addEventListener('click',lpMuat);
 if($('laporanTop')) $('laporanTop').addEventListener('click',lpMuat);
 
@@ -4627,7 +4706,7 @@ function tanya(b){
   opts.forEach((tx,i)=>{const o=mk('button','opt'); o.type='button'; o.appendChild(mk('span','lt','ABC'[i])); o.appendChild(mk('span','',tx));
     o.addEventListener('click',()=>{
       try{speechSynthesis.cancel()}catch(e){}
-      const ok=tx===q.betul; box.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(x.textContent.slice(1)===q.betul)x.classList.add('ok')}); if(!ok)o.classList.add('no');
+      const ok=tx===q.betul; (S.rek=S.rek||[]).push({t:u.t,no:u.no,unit:u.nama,soalan:q.q,jawab:tx,betul:q.betul,ok:ok,ulasan:q.ulasan}); box.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(x.textContent.slice(1)===q.betul)x.classList.add('ok')}); if(!ok)o.classList.add('no');
       lis.hidden=true;
       const fb=mk('div','fb '+(ok?'good':'bad'));
       if(ok){ S.betul++;S.streak++; const base=tambahMarkah(10+Math.min(5,S.streak-1)*2);
@@ -4641,6 +4720,15 @@ function tanya(b){
     }); box.appendChild(o)});
   ov.classList.add('on');
 }
+/* laporan PDF Permainan 2 */
+function laporan2(n){
+  if(!window.__lp||!window.__lp.umum){ if(n)n.textContent='Laporan PDF tidak tersedia.'; return }
+  const rek=S.rek||[], betul=rek.filter(x=>x.ok).length, pct=rek.length?Math.round(betul*100/rek.length):null;
+  window.__lp.umum({permainan:'Dunia Blok Sejarah 3D',fail:'Laporan-JejakMasa-Dunia-Blok-3D.pdf',
+    meta:['Permainan: Dunia Blok Sejarah 3D','Tahun: '+(S.filter?'Tahun '+S.filter:'Semua tahun (Tahun 4, 5 dan 6)'),'Unit selesai: '+S.done+' daripada '+S.total+(S.started?' (permainan masih berjalan, laporan ini merekodkan setakat ini)':'')],
+    kotak:[['Markah',S.score],['Unit selesai',S.done+' / '+S.total],['Betul',rek.length?betul+' / '+rek.length:'-'],['Peratus',pct==null?'-':pct+'%']],
+    peratus:pct,rekod:rek},n);
+}
 function tamat(){
   S.started=false; try{hud(true)}catch(e){} const ov=$(root,'#g2end'), pn=$(ov,'.panel'); pn.textContent='';
   const tot=S.betul+S.salah, pct=tot?Math.round(S.betul/tot*100):0;
@@ -4652,14 +4740,15 @@ function tamat(){
   pn.appendChild(mk('p','','Ketepatan jawapan: '+pct+'% ('+S.betul+' betul, '+S.salah+' salah)'));
   pn.appendChild(mk('h3','',len));
   const best=JM.ld('p2best',0); if(S.score>(best||0)) {JM.sv('p2best',S.score); pn.appendChild(mk('p','rekod','Rekod markah baharu!'))}
+  const lp=mk('button','gbtn alt','Muat turun laporan PDF'); lp.type='button'; const ln=mk('p','lapnota'); lp.addEventListener('click',()=>laporan2(ln));
   const a=mk('button','gbtn','Main lagi'); a.type='button'; a.addEventListener('click',()=>{ov.classList.remove('on');tunjukMula()});
   const b=mk('button','gbtn alt','Kembali ke menu'); b.type='button'; b.addEventListener('click',()=>{ov.classList.remove('on');JM.hub()});
-  pn.appendChild(a);pn.appendChild(b); ov.classList.add('on'); try{exitLock()}catch(e){} beep([523,659,784,1046,1318,1568],.12,'triangle',.07);
+  pn.appendChild(lp);pn.appendChild(ln);pn.appendChild(a);pn.appendChild(b); ov.classList.add('on'); try{exitLock()}catch(e){} beep([523,659,784,1046,1318,1568],.12,'triangle',.07);
 }
 /* ---------- mula / henti ---------- */
 function mulaMain(){
   // tetapkan blok mengikut tahun
-  S.total=0;S.done=0;S.score=0;S.betul=0;S.salah=0;S.streak=0;S.t=0;S.zon=-1;
+  S.total=0;S.done=0;S.score=0;S.betul=0;S.salah=0;S.streak=0;S.t=0;S.zon=-1;S.rek=[];
   QB.forEach(b=>{b.done=false;b.cool=0;b.tries=0;const on=!S.filter||b.u.t===S.filter;b.off=!on;V[(b.x*D+b.z)*H+b.y]=on?G.QBLK:G.AIR;if(on)S.total++});
   letak(); rebuildAll();
   const sp=G.getSpawn(); P.x=sp[0];P.y=sp[1];P.z=sp[2];P.vx=P.vy=P.vz=0;P.yaw=Math.PI/2;P.pitch=-.35;P.s=P.sT=P.sv=1;P.bigT=P.smallT=P.inv=0;P.g=false;P.ay=Math.PI/2; S.safe=[P.x,P.y+.1,P.z];
@@ -4737,6 +4826,7 @@ function bina(el){
   const rs=mk('button','gbtn','Sambung bermain'); rs.type='button'; rs.addEventListener('click',()=>{jeda(false);if(!IN.touch)reqLock()}); pp.appendChild(rs);
   pp.appendChild(mk('h3','','Pergi ke zon'));
   const zs=mk('div','seg2'); G.ZNAMA.forEach((n,i)=>{const b=mk('button','',(i+1)+'');b.type='button';b.title=n;b.addEventListener('click',()=>{lompatZon(i);jeda(false);if(!IN.touch)reqLock()});zs.appendChild(b)}); pp.appendChild(zs);
+  const lpj=mk('button','gbtn alt','Laporan PDF'); lpj.type='button'; const lnj=mk('p','lapnota'); lpj.addEventListener('click',()=>laporan2(lnj)); pp.appendChild(lpj); pp.appendChild(lnj);
   const mr=mk('button','gbtn alt','Mula semula'); mr.type='button'; mr.addEventListener('click',()=>{$(root,'#g2pause').classList.remove('on');S.started=false;tunjukMula()}); pp.appendChild(mr);
   const mh=mk('button','gbtn alt','Keluar ke menu pilihan permainan'); mh.type='button'; mh.addEventListener('click',()=>JM.hub()); pp.appendChild(mh);
   // HUD butang
@@ -4840,6 +4930,7 @@ const mk=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=nu
 const btn=(c,x,f)=>{const b=mk('button',c,x);b.type='button';if(f)b.addEventListener('click',f);return b};
 let root=null, built=false, B=null, TO=[], AC=null, MU=null, tim=null;
 const ST={wira:null,kes:'sd',xp:0,unit:{},boss:{},art:[],tamat:0,tamatF:0,mute:0};
+let LOG3=[];
 const later=(f,ms)=>{const id=setTimeout(()=>{TO=TO.filter(x=>x!==id);f()},ms);TO.push(id);return id};
 const clearTO=()=>{TO.forEach(clearTimeout);TO=[];if(tim){clearInterval(tim);tim=null}};
 function acak(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -4887,7 +4978,7 @@ function simpan(){
   JM.sv('p3',ST);
   JM.sv('p3best','Tahap '+lvl()+' · '+Object.keys(ST.unit).length+'/'+JMB.unit.length+' unit · '+markah()+' markah');
 }
-function muat(){const d=JM.ld('p3',null); if(d&&typeof d==='object'&&d.unit){Object.assign(ST,d)} if(!ST.unit)ST.unit={}; if(!ST.boss)ST.boss={}; if(!ST.art)ST.art=[]; if(WIRA[ST.wira]&&!wiraBuka(ST.wira))ST.wira='panglima'}
+function muat(){const lg=JM.ld('p3log',[]); LOG3=Array.isArray(lg)?lg:[]; const d=JM.ld('p3',null); if(d&&typeof d==='object'&&d.unit){Object.assign(ST,d)} if(!ST.unit)ST.unit={}; if(!ST.boss)ST.boss={}; if(!ST.art)ST.art=[]; if(WIRA[ST.wira]&&!wiraBuka(ST.wira))ST.wira='panglima'}
 
 /* ---------- bunyi ---------- */
 function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){AC=null}}if(AC&&AC.state==='suspended'){try{AC.resume()}catch(e){}}return AC}
@@ -5001,7 +5092,7 @@ function rangka(tajuk,balik,huraian){
   if(balik)bar.appendChild(btn('hb',balik[0],balik[1]));
   const t=mk('div','hhtit'); t.appendChild(mk('b','',tajuk)); if(huraian)t.appendChild(mk('small','',huraian)); bar.appendChild(t);
   const m=btn('hb ic',ST.mute?'🔇':'🔊',()=>{ST.mute=ST.mute?0:1;m.textContent=ST.mute?'🔇':'🔊';simpan();if(ST.mute)hentiMuzik();else if(B&&!B.tamat)muzik(B.k,B.boss);else muzik('M')});
-  m.setAttribute('aria-label','Bunyi hidup atau mati'); bar.appendChild(m);
+  m.setAttribute('aria-label','Bunyi buka atau padam'); bar.appendChild(m);
   c.appendChild(bar); return c;
 }
 function profil(){
@@ -5040,7 +5131,8 @@ function menu(){
   a.appendChild(btn('sec','Peta Kerajaan',()=>ST.wira?peta():wiraPilih(true)));
   a.appendChild(btn('sec','Koleksi',koleksi));
   a.appendChild(btn('sec','Cara Bermain',cara));
-  c.appendChild(a);
+  const lnu=mk('p','muted lapnota'); a.appendChild(btn('sec','Laporan PDF',()=>laporan3(lnu)));
+  c.appendChild(a); c.appendChild(lnu);
   muzik('M');
 }
 function cara(){
@@ -5090,7 +5182,7 @@ function peta(){
     g.appendChild(b);
   });
   c.appendChild(g);
-  const f=mk('div','acts mini'); f.appendChild(btn('sec','Koleksi',koleksi)); f.appendChild(btn('sec','Pilih Wira',()=>wiraPilih(false))); c.appendChild(f);
+  const f=mk('div','acts mini'); f.appendChild(btn('sec','Koleksi',koleksi)); const lnm=mk('p','muted lapnota'); f.appendChild(btn('sec','Pilih Wira',()=>wiraPilih(false))); f.appendChild(btn('sec','Laporan PDF',()=>laporan3(lnm))); c.appendChild(f); c.appendChild(lnm);
   muzik('M');
 }
 function kerajaan(k){
@@ -5283,6 +5375,7 @@ function seranganMusuh(kena,hilang){
 function jawab(i){
   if(!B||B.kunci||B.tamat)return; B.kunci=true; if(tim){clearInterval(tim);tim=null}
   const q=B.q, ok=i>=0&&B.opts[i]===q.betul, bs=B.el.og.children; segarKuasa();
+  try{ const un=q.u?JMB.cari(q.u):(B.cfg&&B.cfg.u); if(un){ LOG3.push({t:un.t,no:un.no,unit:un.nama,soalan:q.q,jawab:i>=0?B.opts[i]:'(masa tamat)',betul:q.betul,ok:ok,ulasan:q.ulasan}); if(LOG3.length>300)LOG3.splice(0,LOG3.length-300); JM.sv('p3log',LOG3) } }catch(e){}
   [].forEach.call(bs,(b,n)=>{b.disabled=true;if(B.opts[n]===q.betul)b.classList.add('ok')}); if(i>=0&&!ok)bs[i].classList.add('no');
   const fb=B.el.fb; fb.textContent=''; let tamat=false;
   if(ok){
@@ -5312,6 +5405,15 @@ function akhir(menang){
     for(let i=0;i<10;i++){const s=mk('i','bint','⭐');s.style.left=(50+Math.random()*34)+'%';s.style.top=(10+Math.random()*30)+'%';s.style.animationDelay=(Math.random()*.4)+'s';e.st.appendChild(s)}
   }else{sfx('kalah');lantas(e.ps,[{opacity:1,filter:'none'},{opacity:.35,filter:'grayscale(1)',transform:'rotate(-70deg) translateY(30px)'}],700,{fill:'forwards'})}
   later(()=>keputusan(menang),menang?1150:950);
+}
+/* laporan PDF Permainan 3 */
+function laporan3(n){
+  if(!window.__lp||!window.__lp.umum){ if(n)n.textContent='Laporan PDF tidak tersedia.'; return }
+  const betul=LOG3.filter(x=>x.ok).length, pct=LOG3.length?Math.round(betul*100/LOG3.length):null, l=lvl(), w=WIRA[ST.wira];
+  window.__lp.umum({permainan:'Wira Sejarah',fail:'Laporan-JejakMasa-Wira-Sejarah.pdf',
+    meta:['Permainan: Wira Sejarah (pertarungan kuiz)','Wira: '+(w?w.n:'belum dipilih')+'  |  Tahap kesukaran: '+KES[ST.kes].n,'Pangkat: Tahap '+l+' ('+GELAR[l-1][0]+')','Unit ditewaskan: '+Object.keys(ST.unit).length+' / '+JMB.unit.length+'  |  Bos ditewaskan: '+KL.filter(k=>ST.boss[k]).length+' / 5  |  Artifak: '+ST.art.length+' / 6','Rekod soalan disimpan pada peranti ini (sehingga 300 soalan terakhir).'],
+    kotak:[['Tahap',l],['XP',ST.xp],['Betul',LOG3.length?betul+' / '+LOG3.length:'-'],['Peratus',pct==null?'-':pct+'%']],
+    peratus:pct,rekod:LOG3.slice()},n);
 }
 function keputusan(menang){
   const Bk=B, cfg=Bk.cfg, j=KJ[cfg.k]; hentiMuzik();
@@ -5354,7 +5456,8 @@ function keputusan(menang){
     else a.appendChild(btn('big','Menara Masa: Bos Terakhir',()=>praBattle({jenis:'agung',k:'F'})));
   }
   a.appendChild(btn('sec',menang?'Main semula':'Cuba lagi',()=>praBattle(cfg)));
-  a.appendChild(btn('sec','Peta Kerajaan',peta)); p.appendChild(a); c.appendChild(p);
+  const lnk=mk('p','muted lapnota'); a.appendChild(btn('sec','Laporan PDF',()=>laporan3(lnk)));
+  a.appendChild(btn('sec','Peta Kerajaan',peta)); p.appendChild(a); p.appendChild(lnk); c.appendChild(p);
   if(menang){const kf=mk('div','konf');for(let i=0;i<26;i++){const e=mk('i');e.style.left=Math.random()*100+'%';e.style.animationDelay=Math.random()*1.6+'s';e.style.background=['#ffd24a','#ff6b6b','#5fd37c','#6ec6ff','#c58cff'][i%5];kf.appendChild(e)}c.appendChild(kf)}
   B=null;
 }
@@ -5369,8 +5472,8 @@ function tahniah(akhirnya){
   t.appendChild(mk('p','','Artifak dikumpul: '+ST.art.length+'/6 · Bos ditewaskan: '+KL.filter(k=>ST.boss[k]).length+'/5 · Jumlah XP: '+ST.xp));
   const a=mk('div','acts');
   if(!akhirnya&&!ST.tamatF)a.appendChild(btn('big','Menara Masa: Bos Terakhir',()=>peta()));
-  a.appendChild(btn('sec','Koleksi',koleksi)); a.appendChild(btn('sec','Peta Kerajaan',peta)); a.appendChild(btn('sec','Menu Utama',()=>{hentiMuzik();JM.hub()}));
-  t.appendChild(a); c.appendChild(t);
+  const lnt=mk('p','muted lapnota'); a.appendChild(btn('sec','Koleksi',koleksi)); a.appendChild(btn('sec','Laporan PDF',()=>laporan3(lnt))); a.appendChild(btn('sec','Peta Kerajaan',peta)); a.appendChild(btn('sec','Menu Utama',()=>{hentiMuzik();JM.hub()}));
+  t.appendChild(a); t.appendChild(lnt); c.appendChild(t);
 }
 function koleksi(){
   const c=rangka('Koleksi',['Kembali',menu],'Artifak, kad ilmu dan ganjaran');
